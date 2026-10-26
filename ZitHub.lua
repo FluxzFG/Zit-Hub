@@ -1240,12 +1240,13 @@ musicPlayButton.Activated:Connect(function()
         return
     end
 
-    -- Nếu ô nhập chứa ID khác, luôn ưu tiên tải bài mới.
+    -- Nếu nhập ID mới, tải bài mới.
     if requestedId ~= musicSound.SoundId then
         loadAndPlayMusic()
         return
     end
 
+    -- Nếu đang phát, tạm dừng.
     if musicSound.IsPlaying then
         musicSound:Pause()
         musicStatus.Text = "Đã tạm dừng"
@@ -1253,10 +1254,15 @@ musicPlayButton.Activated:Connect(function()
         return
     end
 
-    -- Nếu đang tạm dừng, phát tiếp tại vị trí hiện tại.
+    -- Nếu bài đã tải, phát tiếp từ vị trí đang dừng.
     if musicSound.IsLoaded and musicSound.TimeLength > 0 then
         local success, errorMessage = pcall(function()
-            musicSound:Play()
+            if musicSound.TimePosition >= musicSound.TimeLength then
+                musicSound.TimePosition = 0
+                musicSound:Play()
+            else
+                musicSound:Resume()
+            end
         end)
 
         if success then
@@ -1270,7 +1276,7 @@ musicPlayButton.Activated:Connect(function()
         return
     end
 
-    -- Chưa tải bài hoặc bài đã phát hết: phát lại từ đầu.
+    -- Nếu bài chưa tải, thử tải lại.
     loadAndPlayMusic()
 end)
 
