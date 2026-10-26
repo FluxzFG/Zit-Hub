@@ -709,7 +709,7 @@ RunService:BindToRenderStep("ZitHubRealisticCamera", Enum.RenderPriority.Camera.
     elseif not moving and idleSwayEnabled then
         -- Idle sway tăng rõ hơn: chuyển động chậm, lệch pha để giống camera cầm tay.
         -- Vẫn nhân với Camera Intensity để người chơi tự giảm/tăng được.
-        local amount = 0.070 * cameraShakeIntensity -- tăng gấp đôi so với bản Stronger
+        local amount = 0.140 * cameraShakeIntensity -- 50% tương đương 100% của bản IdleSway_2x
         x += math.sin(cameraTime * 1.05) * amount
         y += math.sin(cameraTime * 1.45 + 0.6) * amount * 0.75
         roll += math.sin(cameraTime * 0.9 + 0.3) * amount * 0.22
