@@ -381,6 +381,72 @@ local function applyShader2()
 end
 
 local function applyShader3()
+    clearEffects()
+
+    Lighting.ClockTime = 17.629
+    Lighting.Brightness = 5.63
+    Lighting.ExposureCompensation = 0.63
+
+    Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+    Lighting.OutdoorAmbient = Color3.fromRGB(89, 68, 47)
+
+    Lighting.ColorShift_Top = Color3.fromRGB(207, 114, 0)
+    Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
+
+    Lighting.EnvironmentDiffuseScale = 0.583
+    Lighting.EnvironmentSpecularScale = 1
+
+    Lighting.GlobalShadows = true
+    Lighting.ShadowSoftness = 0.04
+
+    local sky = Instance.new("Sky")
+    sky.SkyboxBk = "rbxassetid://151165214"
+    sky.SkyboxDn = "rbxassetid://151165197"
+    sky.SkyboxFt = "rbxassetid://151165224"
+    sky.SkyboxLf = "rbxassetid://151165191"
+    sky.SkyboxRt = "rbxassetid://151165206"
+    sky.SkyboxUp = "rbxassetid://151165227"
+    sky.SunAngularSize = 21
+    sky.MoonAngularSize = 11
+    sky.StarCount = 1333
+    sky.Parent = Lighting
+
+    local atmosphere = Instance.new("Atmosphere")
+    atmosphere.Density = 0.357
+    atmosphere.Offset = 0
+    atmosphere.Color = Color3.fromRGB(165, 165, 165)
+    atmosphere.Decay = Color3.fromRGB(16, 16, 16)
+    atmosphere.Glare = 0.21
+    atmosphere.Haze = 1.46
+    atmosphere.Parent = Lighting
+
+    local bloom = Instance.new("BloomEffect")
+    bloom.Intensity = 1
+    bloom.Size = 90
+    bloom.Threshold = 2
+    bloom.Parent = Lighting
+
+    local color = Instance.new("ColorCorrectionEffect")
+    color.Brightness = 0.04
+    color.Contrast = 0.15
+    color.Saturation = 0.2
+    color.TintColor = Color3.fromRGB(255, 255, 255)
+    color.Parent = Lighting
+
+    local sunrays = Instance.new("SunRaysEffect")
+    sunrays.Intensity = 0.004
+    sunrays.Spread = 0.167
+    sunrays.Parent = Lighting
+
+    local dof = Instance.new("DepthOfFieldEffect")
+    dof.FocusDistance = 21.16
+    dof.InFocusRadius = 17.31
+    dof.NearIntensity = 0.21
+    dof.FarIntensity = 0.232
+    dof.Parent = Lighting
+end
+
+local function applyShader4()
 	clearEffects()
 	Lighting.ClockTime = 14
 	Lighting.Brightness = 2
@@ -740,7 +806,8 @@ end)
 
 createButton("🌅 Bật Shader: Alonely", Color3.fromRGB(210, 105, 30), applyShader1)
 createButton("☀️ Bật Shader: Cottage", Color3.fromRGB(50, 150, 100), applyShader2)
-createButton("🔄 Xóa Hiệu Ứng (Mặc Định)", Color3.fromRGB(90, 90, 90), applyShader3)
+createButton("🌇 Bật Shader: Sunset", Color3.fromRGB(190, 100, 35), applyShader3)
+createButton("🔄 Xóa Hiệu Ứng (Mặc Định)", Color3.fromRGB(90, 90, 90), applyShader4)
 
 -- Realistic Camera Shake controls
 createButton("🎥 Camera Shake: ON", Color3.fromRGB(45, 145, 95), function()
