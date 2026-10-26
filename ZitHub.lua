@@ -805,6 +805,7 @@ end)
 
 createToggleButton("🌍 Đồng bộ giờ thực", mapTimeFollowReal, function(state)
     mapTimeFollowReal = state
+
     if state then
         applyMapTime()
     else
@@ -812,12 +813,63 @@ createToggleButton("🌍 Đồng bộ giờ thực", mapTimeFollowReal, function
     end
 end)
 
--- Cập nhật đồng hồ map mỗi giây khi bật đồng bộ giờ thực.
+-- Hiển thị giờ thực và giờ trong map
+local mapTimeStatus = Instance.new("TextLabel")
+mapTimeStatus.Name = "MapTimeStatus"
+mapTimeStatus.Size = UDim2.new(1, -10, 0, 34)
+mapTimeStatus.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+mapTimeStatus.BorderSizePixel = 0
+mapTimeStatus.TextColor3 = Color3.fromRGB(255, 255, 255)
+mapTimeStatus.TextSize = 12
+mapTimeStatus.Font = Enum.Font.Gotham
+mapTimeStatus.TextWrapped = true
+mapTimeStatus.Text = "Giờ thực: --:--:-- | Giờ map: --:--"
+mapTimeStatus.Parent = scrollingFrame
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mapTimeStatus
+
+local function formatMapTime(clockTime)
+    local totalMinutes = math.floor((clockTime % 24) * 60 + 0.5)
+        % (24 * 60)
+
+    return string.format(
+        "%02d:%02d",
+        math.floor(totalMinutes / 60),
+        totalMinutes % 60
+    )
+end
+
 task.spawn(function()
     while screenGui.Parent do
-        if mapTimeFollowReal then
-            applyMapTime()
+        local ok, localTime = pcall(function()
+            return DateTime.now():ToLocalTime()
+        end)
+
+        if ok and localTime then
+            local hour = localTime.Hour or 0
+            local minute = localTime.Minute or 0
+            local second = localTime.Second or 0
+
+            if mapTimeFollowReal then
+                Lighting.ClockTime =
+                    hour + minute / 60 + second / 3600
+            end
+
+            mapTimeStatus.Text = string.format(
+                "Giờ thực: %02d:%02d:%02d | Giờ map: %s",
+                hour,
+                minute,
+                second,
+                formatMapTime(Lighting.ClockTime)
+            )
+        else
+            mapTimeStatus.Text =
+                "Không đọc được giờ thực | Giờ map: "
+                .. formatMapTime(Lighting.ClockTime)
         end
+
         task.wait(1)
     end
 end)
@@ -843,5 +895,524 @@ localPlayer.CharacterAdded:Connect(function(character)
 	end
 end)
 
+-- =========================================
+-- 8. ZIT HUB MUSIC PLAYER
+-- =========================================
+
+local SoundService = game:GetService("SoundService")
+
+-- Tạo Sound để phát nhạc phía client
+local musicSound = Instance.new("Sound")
+musicSound.Name = "ZitHubMusic"
+musicSound.Volume = 0.5
+musicSound.Looped = false
+musicSound.Parent = SoundService
+
+local musicFrame = Instance.new("Frame")
+musicFrame.Name = "ZitHubMusicPlayer"
+musicFrame.Size = UDim2.new(1, -10, 0, 190)
+musicFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+musicFrame.BorderSizePixel = 0
+musicFrame.LayoutOrder = 100
+musicFrame.Parent = scrollingFrame
+
+local musicCorner = Instance.new("UICorner")
+musicCorner.CornerRadius = UDim.new(0, 8)
+musicCorner.Parent = musicFrame
+
+-- Tiêu đề
+local musicTitle = Instance.new("TextLabel")
+musicTitle.Size = UDim2.new(1, -20, 0, 25)
+musicTitle.Position = UDim2.new(0, 10, 0, 5)
+musicTitle.BackgroundTransparency = 1
+musicTitle.Text = "🎵 Zit Hub Music"
+musicTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+musicTitle.TextSize = 15
+musicTitle.Font = Enum.Font.GothamBold
+musicTitle.TextXAlignment = Enum.TextXAlignment.Left
+musicTitle.Parent = musicFrame
+
+-- Ô nhập Audio ID
+local musicIdBox = Instance.new("TextBox")
+musicIdBox.Size = UDim2.new(1, -20, 0, 32)
+musicIdBox.Position = UDim2.new(0, 10, 0, 34)
+musicIdBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+musicIdBox.BorderSizePixel = 0
+musicIdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+musicIdBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
+musicIdBox.PlaceholderText = "Nhập Audio ID..."
+musicIdBox.Text = ""
+musicIdBox.TextSize = 13
+musicIdBox.Font = Enum.Font.Gotham
+musicIdBox.ClearTextOnFocus = false
+musicIdBox.Parent = musicFrame
+
+local musicIdCorner = Instance.new("UICorner")
+musicIdCorner.CornerRadius = UDim.new(0, 6)
+musicIdCorner.Parent = musicIdBox
+
+-- Nút phát / tạm dừng
+local musicPlayButton = Instance.new("TextButton")
+musicPlayButton.Size = UDim2.new(0.42, -10, 0, 30)
+musicPlayButton.Position = UDim2.new(0, 10, 0, 73)
+musicPlayButton.BackgroundColor3 = Color3.fromRGB(40, 150, 85)
+musicPlayButton.BorderSizePixel = 0
+musicPlayButton.Text = "▶ Phát"
+musicPlayButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+musicPlayButton.TextSize = 13
+musicPlayButton.Font = Enum.Font.GothamBold
+musicPlayButton.Parent = musicFrame
+
+local musicPlayCorner = Instance.new("UICorner")
+musicPlayCorner.CornerRadius = UDim.new(0, 6)
+musicPlayCorner.Parent = musicPlayButton
+
+-- Trạng thái phát nhạc
+local musicStatus = Instance.new("TextLabel")
+musicStatus.Size = UDim2.new(0.58, -15, 0, 30)
+musicStatus.Position = UDim2.new(0.42, 5, 0, 73)
+musicStatus.BackgroundTransparency = 1
+musicStatus.Text = "Chưa phát nhạc"
+musicStatus.TextColor3 = Color3.fromRGB(220, 220, 220)
+musicStatus.TextSize = 11
+musicStatus.Font = Enum.Font.Gotham
+musicStatus.TextWrapped = true
+musicStatus.Parent = musicFrame
+
+-- Hàm tạo thanh trượt
+local function createMusicSlider(yPosition, title, initialPercent)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 18)
+    label.Position = UDim2.new(0, 10, 0, yPosition)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(240, 240, 240)
+    label.TextSize = 11
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = title
+    label.Parent = musicFrame
+
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(1, -30, 0, 7)
+    bar.Position = UDim2.new(0, 15, 0, yPosition + 20)
+    bar.BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+    bar.BorderSizePixel = 0
+    bar.Active = true
+    bar.Parent = musicFrame
+
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(1, 0)
+    barCorner.Parent = bar
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(initialPercent, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = fill
+
+    local draggingSlider = false
+    local percent = initialPercent
+
+    local function setPercent(newPercent)
+        percent = math.clamp(newPercent, 0, 1)
+        fill.Size = UDim2.new(percent, 0, 1, 0)
+    end
+
+    local function updateFromInput(input)
+        local width = bar.AbsoluteSize.X
+        if width <= 0 then
+            return
+        end
+
+        local relativeX = input.Position.X - bar.AbsolutePosition.X
+        setPercent(relativeX / width)
+    end
+
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = true
+            updateFromInput(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if draggingSlider and (
+            input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        ) then
+            updateFromInput(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = false
+        end
+    end)
+
+    return {
+        SetPercent = setPercent,
+        GetPercent = function()
+            return percent
+        end,
+        IsDragging = function()
+            return draggingSlider
+        end,
+        Label = label,
+    }
+end
+
+-- Thanh tua bài
+local musicTimeline = createMusicSlider(
+    109,
+    "⏩ Tiến trình: 00:00 / 00:00",
+    0
+)
+
+-- Thanh âm lượng
+local musicVolumeSlider = createMusicSlider(
+    151,
+    "🔊 Âm lượng: 50%",
+    0.5
+)
+
+-- Cập nhật âm lượng khi kéo thanh trượt
+musicVolumeSlider.Label.Text = "🔊 Âm lượng: 50%"
+-- =========================================
+-- 8B. MUSIC PLAYER: LOAD, PLAY, PAUSE, VOLUME
+-- =========================================
+
+local musicIsLoading = false
+
+-- Định dạng thời gian thành phút:giây
+local function formatMusicTime(seconds)
+    seconds = math.max(0, math.floor(tonumber(seconds) or 0))
+
+    local minutes = math.floor(seconds / 60)
+    local remainingSeconds = seconds % 60
+
+    return string.format("%02d:%02d", minutes, remainingSeconds)
+end
+
+-- Chuẩn hóa Audio ID thành Roblox asset ID
+local function normalizeAudioId(text)
+    text = tostring(text or "")
+    text = text:match("^%s*(.-)%s*$")
+
+    if text == "" then
+        return nil
+    end
+
+    -- Cho phép nhập nguyên dạng rbxassetid://123456
+    local id = text:match("^rbxassetid://(%d+)$")
+
+    -- Hoặc chỉ nhập dãy số
+    if not id then
+        id = text:match("^(%d+)$")
+    end
+
+    if not id then
+        return nil
+    end
+
+    if tonumber(id) == 0 then
+        return nil
+    end
+
+    return "rbxassetid://" .. id
+end
+
+-- Cập nhật nút phát/tạm dừng
+local function updateMusicPlayButton()
+    if musicSound.IsPlaying then
+        musicPlayButton.Text = "⏸ Tạm dừng"
+        musicPlayButton.BackgroundColor3 = Color3.fromRGB(180, 115, 40)
+    else
+        musicPlayButton.Text = "▶ Phát"
+        musicPlayButton.BackgroundColor3 = Color3.fromRGB(40, 150, 85)
+    end
+end
+
+-- Nạp Audio ID và thử phát nhạc
+local function loadAndPlayMusic()
+    if musicIsLoading then
+        return
+    end
+
+    local audioId = normalizeAudioId(musicIdBox.Text)
+
+    if not audioId then
+        musicStatus.Text = "⚠ Audio ID không hợp lệ"
+        return
+    end
+
+    musicIsLoading = true
+    musicStatus.Text = "Đang tải âm thanh..."
+    musicPlayButton.Text = "⏳ Đang tải"
+
+    -- Dừng bài trước khi thay bằng ID mới
+    musicSound:Stop()
+    musicSound.SoundId = audioId
+    musicTimeline.SetPercent(0)
+
+    local loaded = false
+    local loadFinished = false
+
+    local loadedConnection
+    loadedConnection = musicSound.Loaded:Connect(function()
+        loaded = true
+        loadFinished = true
+    end)
+
+    -- Kiểm tra xem âm thanh có tải được không
+    local startTime = os.clock()
+
+    while not loadFinished and os.clock() - startTime < 12 do
+        if not screenGui.Parent then
+            break
+        end
+
+        task.wait(0.1)
+
+        if musicSound.IsLoaded then
+            loaded = true
+            loadFinished = true
+        end
+    end
+
+    if loadedConnection then
+        loadedConnection:Disconnect()
+    end
+
+    musicIsLoading = false
+
+    if not screenGui.Parent then
+        return
+    end
+
+    if not loaded or not musicSound.IsLoaded then
+        musicStatus.Text = "⚠ Không tải được âm thanh"
+        musicPlayButton.Text = "▶ Thử lại"
+
+        warn(
+            "[Zit Hub Music] Âm thanh không tải được. "
+            .. "Hãy kiểm tra Audio ID và quyền sử dụng asset."
+        )
+
+        return
+    end
+
+    local success, errorMessage = pcall(function()
+        musicSound:Play()
+    end)
+
+    if success then
+        musicStatus.Text = "Đang phát nhạc"
+    else
+        musicStatus.Text = "⚠ Không thể phát âm thanh"
+        warn("[Zit Hub Music] " .. tostring(errorMessage))
+    end
+
+    updateMusicPlayButton()
+end
+
+-- Nút phát / tạm dừng
+musicPlayButton.Activated:Connect(function()
+    if musicIsLoading then
+        return
+    end
+
+    if musicSound.IsPlaying then
+        musicSound:Pause()
+        musicStatus.Text = "Đã tạm dừng"
+        updateMusicPlayButton()
+        return
+    end
+
+    -- Nếu đã tải âm thanh và đang tạm dừng thì tiếp tục bài hiện tại
+    if musicSound.SoundId ~= ""
+        and musicSound.IsLoaded
+        and musicSound.TimeLength > 0
+        and musicSound.TimePosition < musicSound.TimeLength then
+
+        musicSound:Resume()
+        musicStatus.Text = "Đang phát nhạc"
+        updateMusicPlayButton()
+        return
+    end
+
+    -- Nếu chưa có bài hoặc bài trước đã kết thúc thì tải/phát ID hiện tại
+    loadAndPlayMusic()
+end)
+
+-- Điều chỉnh âm lượng bằng thanh trượt
+local function applyMusicVolume()
+    local volume = musicVolumeSlider.GetPercent()
+
+    musicSound.Volume = volume
+
+    musicVolumeSlider.Label.Text = string.format(
+        "🔊 Âm lượng: %d%%",
+        math.floor(volume * 100 + 0.5)
+    )
+end
+
+-- Đặt âm lượng mặc định là 50%
+musicSound.Volume = 0.5
+
+-- Khi nhạc kết thúc
+musicSound.Ended:Connect(function()
+    if not screenGui.Parent then
+        return
+    end
+
+    musicStatus.Text = "Đã phát xong"
+    updateMusicPlayButton()
+end)
+
+-- Xử lý lỗi tải/phát nếu Roblox báo lỗi
+musicSound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
+    if screenGui.Parent then
+        updateMusicPlayButton()
+    end
+end)
+-- =========================================
+-- 8C. MUSIC PLAYER: TIMELINE, TIME & CLEANUP
+-- =========================================
+
+local RunService = game:GetService("RunService")
+
+local musicPlayerAlive = true
+local wasTimelineDragging = false
+
+-- Cập nhật nhãn thời gian của thanh tiến trình
+local function updateMusicTimelineLabel()
+    if not screenGui.Parent then
+        return
+    end
+
+    local currentTime = 0
+    local totalTime = 0
+
+    if musicSound.IsLoaded then
+        currentTime = musicSound.TimePosition
+        totalTime = musicSound.TimeLength
+    end
+
+    musicTimeline.Label.Text = string.format(
+        "⏩ Tiến trình: %s / %s",
+        formatMusicTime(currentTime),
+        formatMusicTime(totalTime)
+    )
+end
+
+-- Đặt thanh tiến trình về đầu bài
+local function resetMusicTimeline()
+    musicTimeline.SetPercent(0)
+    updateMusicTimelineLabel()
+end
+
+-- Cập nhật trạng thái khi tải bài mới
+musicSound:GetPropertyChangedSignal("SoundId"):Connect(function()
+    if not screenGui.Parent then
+        return
+    end
+
+    resetMusicTimeline()
+end)
+
+-- Theo dõi thanh tiến trình và âm lượng
+task.spawn(function()
+    while musicPlayerAlive and screenGui.Parent do
+        task.wait(0.05)
+
+        if not musicPlayerAlive or not screenGui.Parent then
+            break
+        end
+
+        -- Xử lý thanh tiến trình
+        local isDraggingTimeline = musicTimeline.IsDragging()
+
+        if musicSound.IsLoaded and musicSound.TimeLength > 0 then
+            if isDraggingTimeline then
+                -- Kéo thanh để tua đến vị trí mong muốn
+                local percent = math.clamp(
+                    musicTimeline.GetPercent(),
+                    0,
+                    1
+                )
+
+                musicSound.TimePosition =
+                    percent * musicSound.TimeLength
+
+            else
+                -- Khi vừa thả chuột, chốt vị trí tua lần cuối
+                if wasTimelineDragging then
+                    local percent = math.clamp(
+                        musicTimeline.GetPercent(),
+                        0,
+                        1
+                    )
+
+                    musicSound.TimePosition =
+                        percent * musicSound.TimeLength
+                else
+                    -- Khi không kéo, đồng bộ thanh với nhạc đang phát
+                    local percent = math.clamp(
+                        musicSound.TimePosition / musicSound.TimeLength,
+                        0,
+                        1
+                    )
+
+                    musicTimeline.SetPercent(percent)
+                end
+            end
+        end
+
+        wasTimelineDragging = isDraggingTimeline
+
+        updateMusicTimelineLabel()
+
+        -- Chỉ cập nhật âm lượng trong lúc kéo thanh âm lượng
+        if musicVolumeSlider.IsDragging() then
+            applyMusicVolume()
+        end
+    end
+end)
+
+-- Khi nhạc phát xong, đưa thanh tiến trình về cuối
+musicSound.Ended:Connect(function()
+    if not screenGui.Parent then
+        return
+    end
+
+    musicTimeline.SetPercent(1)
+    updateMusicTimelineLabel()
+end)
+
+-- Dọn dẹp Sound khi giao diện bị hủy
+screenGui.Destroying:Connect(function()
+    musicPlayerAlive = false
+
+    pcall(function()
+        musicSound:Stop()
+        musicSound:Destroy()
+    end)
+end)
+
+-- Khởi tạo trạng thái ban đầu
+musicSound.Volume = 0.5
+musicVolumeSlider.SetPercent(0.5)
+
+updateMusicPlayButton()
+updateMusicTimelineLabel()
+
+print("[Zit Hub Music] Music Player đã sẵn sàng!")
 -- Ô nhập liệu & Nút bật tắt CFrame Speed
 createCFrameSpeedControl()
