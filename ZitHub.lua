@@ -1254,9 +1254,7 @@ musicPlayButton.Activated:Connect(function()
     end
 
     -- Nếu đang tạm dừng, phát tiếp tại vị trí hiện tại.
-    if musicSound.IsLoaded
-        and musicSound.TimeLength > 0
-        and musicSound.TimePosition < musicSound.TimeLength then
+    if musicSound.IsLoaded and musicSound.TimeLength > 0 then
         local success, errorMessage = pcall(function()
             musicSound:Play()
         end)
