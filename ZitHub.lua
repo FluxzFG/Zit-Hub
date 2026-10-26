@@ -400,12 +400,12 @@ local function applyShader3()
 	Lighting.ShadowSoftness = 0.1
 	
 	local sky = Instance.new("Sky")
-	sky.SkyboxBk = "rbxassetid://144933338"
-	sky.SkyboxDn = "rbxassetid://144931530"
-	sky.SkyboxFt = "rbxassetid://144933262"
-	sky.SkyboxLf = "rbxassetid://144933244"
-	sky.SkyboxRt = "rbxassetid://144933299"
-	sky.SkyboxUp = "rbxassetid://144931564"
+	sky.SkyboxBk = "rbxassetid://1009082031"
+	sky.SkyboxDn = "rbxassetid://1009082487"
+	sky.SkyboxFt = "rbxassetid://1009082252"
+	sky.SkyboxLf = "rbxassetid://1009082137"
+	sky.SkyboxRt = "rbxassetid://1009081946"
+	sky.SkyboxUp = "rbxassetid://1009082428"
 	sky.SunAngularSize = 5
 	sky.MoonAngularSize = 11
 	sky.StarCount = 1500
