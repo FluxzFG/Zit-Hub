@@ -641,9 +641,26 @@ local idleSwayEnabled = true
 local cameraShakeIntensity = 0.5 -- 0.0 tới 1.0
 local cameraTime = 0
 local impactStrength = 0
--- Theo chuyển động đầu: lấy góc đầu tương đối với thân, làm mượt để tránh giật.
-local headFollowEnabled = false -- OFF mặc định để không ép góc nhìn người chơi
-local smoothedHeadPitch, smoothedHeadYaw, smoothedHeadRoll = 0, 0, 0
+
+-- Map time controls: manual hour or sync with the device's real local time.
+local mapTimeFollowReal = false
+local manualMapClockTime = 12
+
+local function applyMapTime()
+    if mapTimeFollowReal then
+        local ok, localTime = pcall(function()
+            return DateTime.now():ToLocalTime()
+        end)
+        if ok and localTime and localTime.Hour then
+            Lighting.ClockTime = localTime.Hour
+                + ((localTime.Minute or 0) / 60)
+                + ((localTime.Second or 0) / 3600)
+        end
+    else
+        Lighting.ClockTime = manualMapClockTime
+    end
+end
+
 local previousHumanoidStateConnection
 local cameraStateConnection
 
@@ -680,26 +697,6 @@ RunService:BindToRenderStep("ZitHubRealisticCamera", Enum.RenderPriority.Camera.
     local speed = humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed
     local running = moving and speed > 18
     local x, y, roll = 0, 0, 0
-    local headPitch, headYaw, headRoll = 0, 0, 0
-
-    -- Realistic bundle thường animate đầu/cổ; chỉ lấy góc đầu so với thân,
-    -- không gắn camera vào Head nên vẫn giữ góc nhìn Roblox bình thường.
-    local root = character:FindFirstChild("HumanoidRootPart")
-    local head = character:FindFirstChild("Head")
-    if headFollowEnabled and root and head then
-        local relativeHead = root.CFrame:ToObjectSpace(head.CFrame)
-        -- Đọc đủ 3 trục từ hướng đầu so với thân; CFrame của Head đã phản ánh
-        -- chuyển động cổ/đầu mà animation đang áp dụng.
-        local pitch, yaw, headRelativeRoll = relativeHead:ToOrientation()
-        headPitch = math.clamp(pitch, math.rad(-18), math.rad(18))
-        headYaw = math.clamp(yaw, math.rad(-18), math.rad(18))
-        headRoll = math.clamp(headRelativeRoll, math.rad(-8), math.rad(8))
-    end
-    local smoothAlpha = 1 - math.exp(-math.min(dt, 0.05) * 7)
-    smoothedHeadPitch += (headPitch - smoothedHeadPitch) * smoothAlpha
-    smoothedHeadYaw += (headYaw - smoothedHeadYaw) * smoothAlpha
-    smoothedHeadRoll += (headRoll - smoothedHeadRoll) * smoothAlpha
-
     if moving and ((running and runningShakeEnabled) or (not running and walkingShakeEnabled)) then
         local rate = running and 13 or 8
         local amount = (running and 0.045 or 0.022) * cameraShakeIntensity
@@ -794,14 +791,35 @@ end)
 createToggleButton("🌬️ Idle Sway", idleSwayEnabled, function(state)
     idleSwayEnabled = state
 end)
-createToggleButton("🧠 Head Follow", headFollowEnabled, function(state)
-    headFollowEnabled = state
-    if not state then
-        smoothedHeadPitch, smoothedHeadYaw, smoothedHeadRoll = 0, 0, 0
-    end
-end)
 createSlider("🎚️ Camera Intensity (%)", 0, 100, 50, function(value)
     cameraShakeIntensity = value / 100
+end)
+
+-- Chỉnh giờ trong map (chỉ tác động Lighting ở phía client nếu game cho phép).
+createSlider("🕒 Giờ trong map (0–24)", 0, 24, 12, function(value)
+    manualMapClockTime = value
+    if not mapTimeFollowReal then
+        Lighting.ClockTime = manualMapClockTime
+    end
+end)
+
+createToggleButton("🌍 Đồng bộ giờ thực", mapTimeFollowReal, function(state)
+    mapTimeFollowReal = state
+    if state then
+        applyMapTime()
+    else
+        Lighting.ClockTime = manualMapClockTime
+    end
+end)
+
+-- Cập nhật đồng hồ map mỗi giây khi bật đồng bộ giờ thực.
+task.spawn(function()
+    while screenGui.Parent do
+        if mapTimeFollowReal then
+            applyMapTime()
+        end
+        task.wait(1)
+    end
 end)
 
 -- Tốc độ WalkSpeed (Đã gắn thêm cơ chế lưu và tự áp dụng khi nhân vật hồi sinh)
