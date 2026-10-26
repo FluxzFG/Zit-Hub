@@ -1212,7 +1212,7 @@ local function loadAndPlayMusic()
     end
 
     local success, errorMessage = pcall(function()
-        musicSound.TimePosition = 0
+			
         musicSound:Play()
     end)
 
