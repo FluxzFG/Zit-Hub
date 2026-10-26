@@ -445,7 +445,7 @@ local function applyShader3()
 	dof.FarIntensity = 0.232
 	dof.Parent = Lighting
 
-end)
+end
 
 local function applyShader4()
 	clearEffects()
@@ -458,7 +458,9 @@ local function applyShader4()
 	Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
 	Lighting.GlobalShadows = true
 	Lighting.ShadowSoftness = 0.2
-	Lighting.FogEnd = 100000
+    Lighting.FogStart = 0
+    Lighting.FogEnd = 100000
+    Lighting.FogColor = Color3.fromRGB(192, 192, 192)
 end
 
 
