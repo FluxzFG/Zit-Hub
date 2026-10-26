@@ -383,68 +383,69 @@ end
 local function applyShader3()
     clearEffects()
 
-    Lighting.ClockTime = 17.629
-    Lighting.Brightness = 5.63
-    Lighting.ExposureCompensation = 0.63
+    Lighting.ClockTime = 7.1
+	Lighting.Brightness = 3.8
+	Lighting.ExposureCompensation = -0.24
+	
+	Lighting.Ambient = Color3.fromRGB(172, 172, 172)
+	Lighting.OutdoorAmbient = Color3.fromRGB(0,0,0)
+	
+	Lighting.ColorShift_Top = Color3.fromRGB(255, 174, 43)
+	Lighting.ColorShift_Bottom = Color3.fromRGB(0,0,0)
+	
+	Lighting.EnvironmentDiffuseScale = 0.3
+	Lighting.EnvironmentSpecularScale = 0.06
+	
+	Lighting.GlobalShadows = true
+	Lighting.ShadowSoftness = 0.1
+	
+	local sky = Instance.new("Sky")
+	sky.SkyboxBk = "rbxassetid://144933338"
+	sky.SkyboxDn = "rbxassetid://144931530"
+	sky.SkyboxFt = "rbxassetid://144933262"
+	sky.SkyboxLf = "rbxassetid://144933244"
+	sky.SkyboxRt = "rbxassetid://144933299"
+	sky.SkyboxUp = "rbxassetid://144931564"
+	sky.SunAngularSize = 5
+	sky.MoonAngularSize = 11
+	sky.StarCount = 1500
+	sky.Parent = Lighting
 
-    Lighting.Ambient = Color3.fromRGB(0, 0, 0)
-    Lighting.OutdoorAmbient = Color3.fromRGB(89, 68, 47)
+	local atmosphere = Instance.new("Atmosphere")
+	atmosphere.Density = 0.42
+	atmosphere.Offset = 0
+	atmosphere.Color = Color3.fromRGB(199, 170, 107)
+	atmosphere.Decay = Color3.fromRGB(92, 60, 13)
+	atmosphere.Glare = 0
+	atmosphere.Haze = 0
+	atmosphere.Parent = Lighting
 
-    Lighting.ColorShift_Top = Color3.fromRGB(207, 114, 0)
-    Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
+	local bloom = Instance.new("BloomEffect")
+	bloom.Intensity = 1
+	bloom.Size = 56
+	bloom.Threshold = 1.824
+	bloom.Parent = Lighting
 
-    Lighting.EnvironmentDiffuseScale = 0.583
-    Lighting.EnvironmentSpecularScale = 1
+	local color = Instance.new("ColorCorrectionEffect")
+	color.Brightness = 0
+	color.Contrast = 0.1
+	color.Saturation = -0.2
+	color.TintColor = Color3.fromRGB(255, 255, 255)
+	color.Parent = Lighting
 
-    Lighting.GlobalShadows = true
-    Lighting.ShadowSoftness = 0.04
+	local sunrays = Instance.new("SunRaysEffect")
+	sunrays.Intensity = 0.18
+	sunrays.Spread = 0.12
+	sunrays.Parent = Lighting
 
-    local sky = Instance.new("Sky")
-    sky.SkyboxBk = "rbxassetid://151165214"
-    sky.SkyboxDn = "rbxassetid://151165197"
-    sky.SkyboxFt = "rbxassetid://151165224"
-    sky.SkyboxLf = "rbxassetid://151165191"
-    sky.SkyboxRt = "rbxassetid://151165206"
-    sky.SkyboxUp = "rbxassetid://151165227"
-    sky.SunAngularSize = 21
-    sky.MoonAngularSize = 11
-    sky.StarCount = 1333
-    sky.Parent = Lighting
+	local dof = Instance.new("DepthOfFieldEffect")
+	dof.FocusDistance = 21.16
+	dof.InFocusRadius = 17.31
+	dof.NearIntensity = 0.21
+	dof.FarIntensity = 0.232
+	dof.Parent = Lighting
 
-    local atmosphere = Instance.new("Atmosphere")
-    atmosphere.Density = 0.357
-    atmosphere.Offset = 0
-    atmosphere.Color = Color3.fromRGB(165, 165, 165)
-    atmosphere.Decay = Color3.fromRGB(16, 16, 16)
-    atmosphere.Glare = 0.21
-    atmosphere.Haze = 1.46
-    atmosphere.Parent = Lighting
-
-    local bloom = Instance.new("BloomEffect")
-    bloom.Intensity = 1
-    bloom.Size = 90
-    bloom.Threshold = 2
-    bloom.Parent = Lighting
-
-    local color = Instance.new("ColorCorrectionEffect")
-    color.Brightness = 0.04
-    color.Contrast = 0.15
-    color.Saturation = 0.2
-    color.TintColor = Color3.fromRGB(255, 255, 255)
-    color.Parent = Lighting
-
-    local sunrays = Instance.new("SunRaysEffect")
-    sunrays.Intensity = 0.004
-    sunrays.Spread = 0.167
-    sunrays.Parent = Lighting
-
-    local dof = Instance.new("DepthOfFieldEffect")
-    dof.FocusDistance = 21.16
-    dof.InFocusRadius = 17.31
-    dof.NearIntensity = 0.21
-    dof.FarIntensity = 0.232
-    dof.Parent = Lighting
-end
+end)
 
 local function applyShader4()
 	clearEffects()
