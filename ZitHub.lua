@@ -628,6 +628,115 @@ local function createCFrameSpeedControl()
 end
 
 
+
+-- =========================================
+-- 6B. REALISTIC CAMERA EFFECTS
+-- Hiệu ứng chỉ tác động camera cục bộ, không thay đổi vị trí nhân vật.
+-- =========================================
+local cameraShakeEnabled = true
+local walkingShakeEnabled = true
+local runningShakeEnabled = true
+local impactShakeEnabled = true
+local idleSwayEnabled = true
+local cameraShakeIntensity = 0.5 -- 0.0 tới 1.0
+local cameraTime = 0
+local impactStrength = 0
+-- Theo chuyển động đầu: lấy góc đầu tương đối với thân, làm mượt để tránh giật.
+local headFollowEnabled = false -- OFF mặc định để không ép góc nhìn người chơi
+local smoothedHeadPitch, smoothedHeadYaw, smoothedHeadRoll = 0, 0, 0
+local previousHumanoidStateConnection
+local cameraStateConnection
+
+local function bindCameraState(character)
+    if previousHumanoidStateConnection then
+        previousHumanoidStateConnection:Disconnect()
+        previousHumanoidStateConnection = nil
+    end
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        previousHumanoidStateConnection = humanoid.StateChanged:Connect(function(_, newState)
+            if impactShakeEnabled and newState == Enum.HumanoidStateType.Landed then
+                impactStrength = math.max(impactStrength, 1)
+            end
+        end)
+    end
+end
+
+if localPlayer.Character then bindCameraState(localPlayer.Character) end
+local characterAddedCameraConnection = localPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.2)
+    bindCameraState(character)
+end)
+
+RunService:BindToRenderStep("ZitHubRealisticCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
+    if not cameraShakeEnabled then return end
+    local camera = workspace.CurrentCamera
+    local character = localPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not camera or not humanoid then return end
+
+    cameraTime += math.min(dt, 0.05)
+    local moving = humanoid.MoveDirection.Magnitude > 0.05
+    local speed = humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed
+    local running = moving and speed > 18
+    local x, y, roll = 0, 0, 0
+    local headPitch, headYaw, headRoll = 0, 0, 0
+
+    -- Realistic bundle thường animate đầu/cổ; chỉ lấy góc đầu so với thân,
+    -- không gắn camera vào Head nên vẫn giữ góc nhìn Roblox bình thường.
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local head = character:FindFirstChild("Head")
+    if headFollowEnabled and root and head then
+        local relativeHead = root.CFrame:ToObjectSpace(head.CFrame)
+        -- Đọc đủ 3 trục từ hướng đầu so với thân; CFrame của Head đã phản ánh
+        -- chuyển động cổ/đầu mà animation đang áp dụng.
+        local pitch, yaw, headRelativeRoll = relativeHead:ToOrientation()
+        headPitch = math.clamp(pitch, math.rad(-18), math.rad(18))
+        headYaw = math.clamp(yaw, math.rad(-18), math.rad(18))
+        headRoll = math.clamp(headRelativeRoll, math.rad(-8), math.rad(8))
+    end
+    local smoothAlpha = 1 - math.exp(-math.min(dt, 0.05) * 7)
+    smoothedHeadPitch += (headPitch - smoothedHeadPitch) * smoothAlpha
+    smoothedHeadYaw += (headYaw - smoothedHeadYaw) * smoothAlpha
+    smoothedHeadRoll += (headRoll - smoothedHeadRoll) * smoothAlpha
+
+    if moving and ((running and runningShakeEnabled) or (not running and walkingShakeEnabled)) then
+        local rate = running and 13 or 8
+        local amount = (running and 0.045 or 0.022) * cameraShakeIntensity
+        y += math.abs(math.sin(cameraTime * rate)) * amount
+        x += math.sin(cameraTime * rate * 0.5) * amount * 0.55
+        roll += math.sin(cameraTime * rate * 0.5) * amount * 0.35
+    elseif not moving and idleSwayEnabled then
+        -- Idle sway tăng rõ hơn: chuyển động chậm, lệch pha để giống camera cầm tay.
+        -- Vẫn nhân với Camera Intensity để người chơi tự giảm/tăng được.
+        local amount = 0.070 * cameraShakeIntensity -- tăng gấp đôi so với bản Stronger
+        x += math.sin(cameraTime * 1.05) * amount
+        y += math.sin(cameraTime * 1.45 + 0.6) * amount * 0.75
+        roll += math.sin(cameraTime * 0.9 + 0.3) * amount * 0.22
+    end
+
+    if impactShakeEnabled and impactStrength > 0.001 then
+        local decay = math.min(dt * 5, 1)
+        y -= 0.09 * impactStrength * cameraShakeIntensity
+        x += math.sin(cameraTime * 35) * 0.035 * impactStrength * cameraShakeIntensity
+        roll += math.sin(cameraTime * 28) * 0.025 * impactStrength * cameraShakeIntensity
+        impactStrength *= (1 - decay)
+    end
+
+    -- Camera shake only: tidak ikut yaw/pitch/roll của đầu để tránh tự xoay.
+    -- Người chơi luôn giữ toàn quyền điều khiển hướng nhìn bằng chuột.
+    -- Chỉ thêm chuyển động tịnh tiến rất nhẹ và roll quanh trục nhìn.
+    camera.CFrame = camera.CFrame
+        * CFrame.new(x, y, 0)
+        * CFrame.Angles(0, 0, roll)
+end)
+
+screenGui.Destroying:Connect(function()
+    pcall(function() RunService:UnbindFromRenderStep("ZitHubRealisticCamera") end)
+    if previousHumanoidStateConnection then previousHumanoidStateConnection:Disconnect() end
+    if characterAddedCameraConnection then characterAddedCameraConnection:Disconnect() end
+end)
+
 -- =========================================
 -- 7. THÊM CÁC TÍNH NĂNG VÀO MENU
 -- =========================================
@@ -635,6 +744,65 @@ end
 createButton("🌅 Bật Shader: Alonely", Color3.fromRGB(210, 105, 30), applyShader1)
 createButton("☀️ Bật Shader: Cottage", Color3.fromRGB(50, 150, 100), applyShader2)
 createButton("🔄 Xóa Hiệu Ứng (Mặc Định)", Color3.fromRGB(90, 90, 90), applyShader3)
+
+-- Realistic Camera Shake controls
+createButton("🎥 Camera Shake: ON", Color3.fromRGB(45, 145, 95), function()
+    cameraShakeEnabled = not cameraShakeEnabled
+    -- Cập nhật nhãn nút sau khi bật/tắt
+    for _, item in ipairs(scrollingFrame:GetChildren()) do
+        if item:IsA("TextButton") and (item.Text == "🎥 Camera Shake: ON" or item.Text == "🎥 Camera Shake: OFF") then
+            item.Text = cameraShakeEnabled and "🎥 Camera Shake: ON" or "🎥 Camera Shake: OFF"
+            item.BackgroundColor3 = cameraShakeEnabled and Color3.fromRGB(45, 145, 95) or Color3.fromRGB(70, 95, 150)
+        end
+    end
+end)
+local function createToggleButton(label, initialState, callback)
+    local state = initialState
+    local btn
+    local function refresh()
+        btn.Text = label .. (state and ": ON" or ": OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(45, 145, 95) or Color3.fromRGB(70, 95, 150)
+    end
+    btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 38)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 145, 95)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamSemibold
+    btn.Parent = scrollingFrame
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+    refresh()
+    btn.Activated:Connect(function()
+        state = not state
+        callback(state)
+        refresh()
+    end)
+end
+
+createToggleButton("🚶 Walking Shake", walkingShakeEnabled, function(state)
+    walkingShakeEnabled = state
+end)
+createToggleButton("🏃 Running Shake", runningShakeEnabled, function(state)
+    runningShakeEnabled = state
+end)
+createToggleButton("💥 Impact Shake", impactShakeEnabled, function(state)
+    impactShakeEnabled = state
+    if not state then impactStrength = 0 end
+end)
+createToggleButton("🌬️ Idle Sway", idleSwayEnabled, function(state)
+    idleSwayEnabled = state
+end)
+createToggleButton("🧠 Head Follow", headFollowEnabled, function(state)
+    headFollowEnabled = state
+    if not state then
+        smoothedHeadPitch, smoothedHeadYaw, smoothedHeadRoll = 0, 0, 0
+    end
+end)
+createSlider("🎚️ Camera Intensity (%)", 0, 100, 50, function(value)
+    cameraShakeIntensity = value / 100
+end)
 
 -- Tốc độ WalkSpeed (Đã gắn thêm cơ chế lưu và tự áp dụng khi nhân vật hồi sinh)
 createSlider("⚡ Tốc Độ (WalkSpeed)", 1, 100, 1, function(speed)
