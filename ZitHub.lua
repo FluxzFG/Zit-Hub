@@ -1318,23 +1318,24 @@ task.spawn(function()
 
         local isDraggingTimeline = musicTimeline.IsDragging()
 
-        if musicSound.IsLoaded and musicSound.TimeLength > 0 then
-            if isDraggingTimeline then
-                musicSound.TimePosition =
-                    musicTimeline.GetPercent() * musicSound.TimeLength
-            elseif wasTimelineDragging then
-                musicSound.TimePosition =
-                    musicTimeline.GetPercent() * musicSound.TimeLength
-            else
-                musicTimeline.SetPercent(
-                    math.clamp(
-                        musicSound.TimePosition / musicSound.TimeLength,
-                        0,
-                        1
-                    )
-                )
-            end
-        end
+if musicSound.IsLoaded and musicSound.TimeLength > 0 then
+    if isDraggingTimeline then
+        musicSound.TimePosition =
+            musicTimeline.GetPercent() * musicSound.TimeLength
+    elseif wasTimelineDragging then
+        musicSound.TimePosition =
+            musicTimeline.GetPercent() * musicSound.TimeLength
+    else
+        -- Chỉ cập nhật thanh tiến trình, không thay đổi vị trí phát.
+        musicTimeline.SetPercent(
+            math.clamp(
+                musicSound.TimePosition / musicSound.TimeLength,
+                0,
+                1
+            )
+        )
+    end
+end
 
         wasTimelineDragging = isDraggingTimeline
         updateMusicTimelineLabel()
