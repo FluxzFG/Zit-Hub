@@ -1222,33 +1222,44 @@ local function loadAndPlayMusic()
     updateMusicPlayButton()
 end
 
--- Nút phát / tạm dừng
 musicPlayButton.Activated:Connect(function()
     if musicIsLoading then
         return
     end
 
+    local requestedId = normalizeAudioId(musicIdBox.Text)
+
+    if not requestedId then
+        musicStatus.Text = "⚠ Audio ID không hợp lệ"
+        return
+    end
+
+    -- Nếu nhập ID khác, tải bài mới thay vì tiếp tục bài cũ
+    if requestedId ~= musicSound.SoundId then
+        loadAndPlayMusic()
+        return
+    end
+
+    -- Cùng ID: nhấn để tạm dừng
     if musicSound.IsPlaying then
         musicSound:Pause()
         musicStatus.Text = "Đã tạm dừng"
-        updateMusicPlayButton()
-        return
-    end
 
-    -- Nếu đã tải âm thanh và đang tạm dừng thì tiếp tục bài hiện tại
-    if musicSound.SoundId ~= ""
-        and musicSound.IsLoaded
+    -- Cùng ID: tiếp tục từ vị trí đã tạm dừng
+    elseif musicSound.IsLoaded
         and musicSound.TimeLength > 0
         and musicSound.TimePosition < musicSound.TimeLength then
 
-        musicSound:Resume()
+        musicSound:Play()
         musicStatus.Text = "Đang phát nhạc"
-        updateMusicPlayButton()
+
+    -- Chưa tải được hoặc bài đã phát hết
+    else
+        loadAndPlayMusic()
         return
     end
 
-    -- Nếu chưa có bài hoặc bài trước đã kết thúc thì tải/phát ID hiện tại
-    loadAndPlayMusic()
+    updateMusicPlayButton()
 end)
 
 -- Điều chỉnh âm lượng bằng thanh trượt
