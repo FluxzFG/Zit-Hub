@@ -901,7 +901,6 @@ end)
 
 local SoundService = game:GetService("SoundService")
 
--- Tạo Sound để phát nhạc phía client
 local musicSound = Instance.new("Sound")
 musicSound.Name = "ZitHubMusic"
 musicSound.Volume = 0.5
@@ -979,7 +978,7 @@ musicStatus.Font = Enum.Font.Gotham
 musicStatus.TextWrapped = true
 musicStatus.Parent = musicFrame
 
--- Hàm tạo thanh trượt
+-- Tạo thanh trượt
 local function createMusicSlider(yPosition, title, initialPercent)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -20, 0, 18)
@@ -1068,241 +1067,60 @@ local function createMusicSlider(yPosition, title, initialPercent)
     }
 end
 
--- Thanh tua bài
 local musicTimeline = createMusicSlider(
     109,
     "⏩ Tiến trình: 00:00 / 00:00",
     0
 )
 
--- Thanh âm lượng
 local musicVolumeSlider = createMusicSlider(
     151,
     "🔊 Âm lượng: 50%",
     0.5
 )
 
--- Cập nhật âm lượng khi kéo thanh trượt
-musicVolumeSlider.Label.Text = "🔊 Âm lượng: 50%"
--- =========================================
--- 8B. MUSIC PLAYER: LOAD, PLAY, PAUSE, VOLUME
--- =========================================
-
 local musicIsLoading = false
+local musicPlayerAlive = true
+local wasTimelineDragging = false
+local loadRequestId = 0
 
--- Định dạng thời gian thành phút:giây
+-- Định dạng thời gian
 local function formatMusicTime(seconds)
     seconds = math.max(0, math.floor(tonumber(seconds) or 0))
-
-    local minutes = math.floor(seconds / 60)
-    local remainingSeconds = seconds % 60
-
-    return string.format("%02d:%02d", minutes, remainingSeconds)
+    return string.format("%02d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
--- Chuẩn hóa Audio ID thành Roblox asset ID
+-- Chuẩn hóa Audio ID
 local function normalizeAudioId(text)
-    text = tostring(text or "")
-    text = text:match("^%s*(.-)%s*$")
+    text = tostring(text or ""):match("^%s*(.-)%s*$")
 
     if text == "" then
         return nil
     end
 
-    -- Cho phép nhập nguyên dạng rbxassetid://123456
     local id = text:match("^rbxassetid://(%d+)$")
+        or text:match("^(%d+)$")
 
-    -- Hoặc chỉ nhập dãy số
-    if not id then
-        id = text:match("^(%d+)$")
-    end
-
-    if not id then
-        return nil
-    end
-
-    if tonumber(id) == 0 then
+    if not id or tonumber(id) == 0 then
         return nil
     end
 
     return "rbxassetid://" .. id
 end
 
--- Cập nhật nút phát/tạm dừng
 local function updateMusicPlayButton()
     if musicSound.IsPlaying then
         musicPlayButton.Text = "⏸ Tạm dừng"
         musicPlayButton.BackgroundColor3 = Color3.fromRGB(180, 115, 40)
+    elseif musicIsLoading then
+        musicPlayButton.Text = "⏳ Đang tải"
+        musicPlayButton.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
     else
         musicPlayButton.Text = "▶ Phát"
         musicPlayButton.BackgroundColor3 = Color3.fromRGB(40, 150, 85)
     end
 end
 
--- Nạp Audio ID và thử phát nhạc
-local function loadAndPlayMusic()
-    if musicIsLoading then
-        return
-    end
-
-    local audioId = normalizeAudioId(musicIdBox.Text)
-
-    if not audioId then
-        musicStatus.Text = "⚠ Audio ID không hợp lệ"
-        return
-    end
-
-    musicIsLoading = true
-    musicStatus.Text = "Đang tải âm thanh..."
-    musicPlayButton.Text = "⏳ Đang tải"
-
-    -- Dừng bài trước khi thay bằng ID mới
-    musicSound:Stop()
-    musicSound.SoundId = audioId
-    musicTimeline.SetPercent(0)
-
-    local loaded = false
-    local loadFinished = false
-
-    local loadedConnection
-    loadedConnection = musicSound.Loaded:Connect(function()
-        loaded = true
-        loadFinished = true
-    end)
-
-    -- Kiểm tra xem âm thanh có tải được không
-    local startTime = os.clock()
-
-    while not loadFinished and os.clock() - startTime < 12 do
-        if not screenGui.Parent then
-            break
-        end
-
-        task.wait(0.1)
-
-        if musicSound.IsLoaded then
-            loaded = true
-            loadFinished = true
-        end
-    end
-
-    if loadedConnection then
-        loadedConnection:Disconnect()
-    end
-
-    musicIsLoading = false
-
-    if not screenGui.Parent then
-        return
-    end
-
-    if not loaded or not musicSound.IsLoaded then
-        musicStatus.Text = "⚠ Không tải được âm thanh"
-        musicPlayButton.Text = "▶ Thử lại"
-
-        warn(
-            "[Zit Hub Music] Âm thanh không tải được. "
-            .. "Hãy kiểm tra Audio ID và quyền sử dụng asset."
-        )
-
-        return
-    end
-
-    local success, errorMessage = pcall(function()
-        musicSound:Play()
-    end)
-
-    if success then
-        musicStatus.Text = "Đang phát nhạc"
-    else
-        musicStatus.Text = "⚠ Không thể phát âm thanh"
-        warn("[Zit Hub Music] " .. tostring(errorMessage))
-    end
-
-    updateMusicPlayButton()
-end
-
-musicPlayButton.Activated:Connect(function()
-    if musicIsLoading then
-        return
-    end
-
-    local requestedId = normalizeAudioId(musicIdBox.Text)
-
-    if not requestedId then
-        musicStatus.Text = "⚠ Audio ID không hợp lệ"
-        return
-    end
-
-    -- Nếu nhập ID khác, tải bài mới thay vì tiếp tục bài cũ
-    if requestedId ~= musicSound.SoundId then
-        loadAndPlayMusic()
-        return
-    end
-
-    -- Cùng ID: nhấn để tạm dừng
-    if musicSound.IsPlaying then
-        musicSound:Pause()
-        musicStatus.Text = "Đã tạm dừng"
-
-    -- Cùng ID: tiếp tục từ vị trí đã tạm dừng
-    elseif musicSound.IsLoaded
-        and musicSound.TimeLength > 0
-        and musicSound.TimePosition < musicSound.TimeLength then
-
-        musicSound:Play()
-        musicStatus.Text = "Đang phát nhạc"
-
-    -- Chưa tải được hoặc bài đã phát hết
-    else
-        loadAndPlayMusic()
-        return
-    end
-
-    updateMusicPlayButton()
-end)
-
--- Điều chỉnh âm lượng bằng thanh trượt
-local function applyMusicVolume()
-    local volume = musicVolumeSlider.GetPercent()
-
-    musicSound.Volume = volume
-
-    musicVolumeSlider.Label.Text = string.format(
-        "🔊 Âm lượng: %d%%",
-        math.floor(volume * 100 + 0.5)
-    )
-end
-
--- Đặt âm lượng mặc định là 50%
-musicSound.Volume = 0.5
-
--- Khi nhạc kết thúc
-musicSound.Ended:Connect(function()
-    if not screenGui.Parent then
-        return
-    end
-
-    musicStatus.Text = "Đã phát xong"
-    updateMusicPlayButton()
-end)
-
--- Xử lý lỗi tải/phát nếu Roblox báo lỗi
-musicSound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
-    if screenGui.Parent then
-        updateMusicPlayButton()
-    end
-end)
--- =========================================
--- 8C. MUSIC PLAYER: TIMELINE, TIME & CLEANUP
--- =========================================
-
-local RunService = game:GetService("RunService")
-
-local musicPlayerAlive = true
-local wasTimelineDragging = false
-
--- Cập nhật nhãn thời gian của thanh tiến trình
 local function updateMusicTimelineLabel()
     if not screenGui.Parent then
         return
@@ -1323,22 +1141,175 @@ local function updateMusicTimelineLabel()
     )
 end
 
--- Đặt thanh tiến trình về đầu bài
 local function resetMusicTimeline()
     musicTimeline.SetPercent(0)
     updateMusicTimelineLabel()
 end
 
--- Cập nhật trạng thái khi tải bài mới
-musicSound:GetPropertyChangedSignal("SoundId"):Connect(function()
+-- Tải ID mới. Mỗi yêu cầu có mã riêng để tránh lượt tải cũ ghi đè lượt mới.
+local function loadAndPlayMusic()
+    local audioId = normalizeAudioId(musicIdBox.Text)
+
+    if not audioId then
+        musicStatus.Text = "⚠ Audio ID không hợp lệ"
+        return
+    end
+
+    loadRequestId += 1
+    local thisRequest = loadRequestId
+
+    musicIsLoading = true
+    musicStatus.Text = "Đang tải Audio ID mới..."
+    updateMusicPlayButton()
+
+    musicSound:Stop()
+    musicSound.TimePosition = 0
+    musicTimeline.SetPercent(0)
+
+    -- Xóa ID cũ trước khi gán ID mới.
+    musicSound.SoundId = ""
+    task.wait()
+    
+    if not screenGui.Parent or thisRequest ~= loadRequestId then
+        return
+    end
+
+    musicSound.SoundId = audioId
+
+    local startTime = os.clock()
+    local loaded = false
+
+    while os.clock() - startTime < 15 do
+        if not screenGui.Parent or thisRequest ~= loadRequestId then
+            return
+        end
+
+        if musicSound.SoundId == audioId
+            and musicSound.IsLoaded
+            and musicSound.TimeLength > 0 then
+            loaded = true
+            break
+        end
+
+        task.wait(0.1)
+    end
+
+    if not screenGui.Parent or thisRequest ~= loadRequestId then
+        return
+    end
+
+    musicIsLoading = false
+
+    if not loaded then
+        musicStatus.Text = "⚠ Không tải được ID này"
+        warn(
+            "[Zit Hub Music] Không tải được Audio ID: "
+            .. audioId
+            .. ". Kiểm tra ID, quyền sử dụng và khả năng truy cập asset."
+        )
+        updateMusicPlayButton()
+        return
+    end
+
+    local success, errorMessage = pcall(function()
+        musicSound.TimePosition = 0
+        musicSound:Play()
+    end)
+
+    if success then
+        musicStatus.Text = "Đang phát Audio ID mới"
+    else
+        musicStatus.Text = "⚠ Không thể phát âm thanh"
+        warn("[Zit Hub Music] " .. tostring(errorMessage))
+    end
+
+    updateMusicPlayButton()
+    updateMusicTimelineLabel()
+end
+
+-- Nút Phát / Tạm dừng
+musicPlayButton.Activated:Connect(function()
+    if musicIsLoading then
+        return
+    end
+
+    local requestedId = normalizeAudioId(musicIdBox.Text)
+
+    if not requestedId then
+        musicStatus.Text = "⚠ Audio ID không hợp lệ"
+        return
+    end
+
+    -- Nếu ô nhập chứa ID khác, luôn ưu tiên tải bài mới.
+    if requestedId ~= musicSound.SoundId then
+        loadAndPlayMusic()
+        return
+    end
+
+    if musicSound.IsPlaying then
+        musicSound:Pause()
+        musicStatus.Text = "Đã tạm dừng"
+        updateMusicPlayButton()
+        return
+    end
+
+    -- Nếu đang tạm dừng, phát tiếp tại vị trí hiện tại.
+    if musicSound.IsLoaded
+        and musicSound.TimeLength > 0
+        and musicSound.TimePosition < musicSound.TimeLength then
+        local success, errorMessage = pcall(function()
+            musicSound:Play()
+        end)
+
+        if success then
+            musicStatus.Text = "Đang phát nhạc"
+        else
+            musicStatus.Text = "⚠ Không thể tiếp tục phát"
+            warn("[Zit Hub Music] " .. tostring(errorMessage))
+        end
+
+        updateMusicPlayButton()
+        return
+    end
+
+    -- Chưa tải bài hoặc bài đã phát hết: phát lại từ đầu.
+    loadAndPlayMusic()
+end)
+
+-- Điều chỉnh âm lượng
+local function applyMusicVolume()
+    local volume = musicVolumeSlider.GetPercent()
+    musicSound.Volume = volume
+    musicVolumeSlider.Label.Text = string.format(
+        "🔊 Âm lượng: %d%%",
+        math.floor(volume * 100 + 0.5)
+    )
+end
+
+musicSound.Ended:Connect(function()
     if not screenGui.Parent then
         return
     end
 
-    resetMusicTimeline()
+    musicStatus.Text = "Đã phát xong"
+    musicTimeline.SetPercent(1)
+    updateMusicPlayButton()
+    updateMusicTimelineLabel()
 end)
 
--- Theo dõi thanh tiến trình và âm lượng
+musicSound:GetPropertyChangedSignal("IsPlaying"):Connect(function()
+    if screenGui.Parent then
+        updateMusicPlayButton()
+    end
+end)
+
+musicSound:GetPropertyChangedSignal("SoundId"):Connect(function()
+    if screenGui.Parent then
+        resetMusicTimeline()
+    end
+end)
+
+-- Theo dõi tiến trình và âm lượng
 task.spawn(function()
     while musicPlayerAlive and screenGui.Parent do
         task.wait(0.05)
@@ -1347,69 +1318,38 @@ task.spawn(function()
             break
         end
 
-        -- Xử lý thanh tiến trình
         local isDraggingTimeline = musicTimeline.IsDragging()
 
         if musicSound.IsLoaded and musicSound.TimeLength > 0 then
             if isDraggingTimeline then
-                -- Kéo thanh để tua đến vị trí mong muốn
-                local percent = math.clamp(
-                    musicTimeline.GetPercent(),
-                    0,
-                    1
-                )
-
                 musicSound.TimePosition =
-                    percent * musicSound.TimeLength
-
+                    musicTimeline.GetPercent() * musicSound.TimeLength
+            elseif wasTimelineDragging then
+                musicSound.TimePosition =
+                    musicTimeline.GetPercent() * musicSound.TimeLength
             else
-                -- Khi vừa thả chuột, chốt vị trí tua lần cuối
-                if wasTimelineDragging then
-                    local percent = math.clamp(
-                        musicTimeline.GetPercent(),
-                        0,
-                        1
-                    )
-
-                    musicSound.TimePosition =
-                        percent * musicSound.TimeLength
-                else
-                    -- Khi không kéo, đồng bộ thanh với nhạc đang phát
-                    local percent = math.clamp(
+                musicTimeline.SetPercent(
+                    math.clamp(
                         musicSound.TimePosition / musicSound.TimeLength,
                         0,
                         1
                     )
-
-                    musicTimeline.SetPercent(percent)
-                end
+                )
             end
         end
 
         wasTimelineDragging = isDraggingTimeline
-
         updateMusicTimelineLabel()
 
-        -- Chỉ cập nhật âm lượng trong lúc kéo thanh âm lượng
         if musicVolumeSlider.IsDragging() then
             applyMusicVolume()
         end
     end
 end)
 
--- Khi nhạc phát xong, đưa thanh tiến trình về cuối
-musicSound.Ended:Connect(function()
-    if not screenGui.Parent then
-        return
-    end
-
-    musicTimeline.SetPercent(1)
-    updateMusicTimelineLabel()
-end)
-
--- Dọn dẹp Sound khi giao diện bị hủy
 screenGui.Destroying:Connect(function()
     musicPlayerAlive = false
+    loadRequestId += 1
 
     pcall(function()
         musicSound:Stop()
@@ -1417,10 +1357,8 @@ screenGui.Destroying:Connect(function()
     end)
 end)
 
--- Khởi tạo trạng thái ban đầu
 musicSound.Volume = 0.5
 musicVolumeSlider.SetPercent(0.5)
-
 updateMusicPlayButton()
 updateMusicTimelineLabel()
 
