@@ -711,6 +711,12 @@ local cameraShakeIntensity = 0.5 -- 0.0 tới 1.0
 local cameraTime = 0
 local impactStrength = 0
 
+-- Camera nghiêng nhẹ theo hướng di chuyển (chỉ là hiệu ứng camera cục bộ).
+local strafeTiltEnabled = true
+local strafeTiltAngle = 5 -- góc nghiêng tối đa, tính bằng độ
+local currentStrafeRoll = 0
+local strafeTiltSmoothness = 8
+
 -- Map time controls: manual hour or sync with the device's real local time.
 local mapTimeFollowReal = false
 local manualMapClockTime = 12
@@ -755,46 +761,62 @@ local characterAddedCameraConnection = localPlayer.CharacterAdded:Connect(functi
 end)
 
 RunService:BindToRenderStep("ZitHubRealisticCamera", Enum.RenderPriority.Camera.Value + 1, function(dt)
-    if not cameraShakeEnabled then return end
     local camera = workspace.CurrentCamera
+    if not camera then
+        currentStrafeRoll = 0
+        return
+    end
+
     local character = localPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not camera or not humanoid then return end
 
-    cameraTime += math.min(dt, 0.05)
-    local moving = humanoid.MoveDirection.Magnitude > 0.05
-    local speed = humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed
-    local running = moving and speed > 18
+    -- Tính góc nghiêng dựa trên hướng di chuyển tương đối với camera.
+    local targetStrafeRoll = 0
+    if strafeTiltEnabled and humanoid and humanoid.Health > 0 then
+        local localMoveDirection = camera.CFrame:VectorToObjectSpace(humanoid.MoveDirection)
+        targetStrafeRoll = math.rad(-localMoveDirection.X * strafeTiltAngle)
+    end
+
+    -- Làm mượt theo delta time để tốc độ chuyển động ít phụ thuộc FPS.
+    local smoothAlpha = 1 - math.exp(-strafeTiltSmoothness * math.min(dt, 0.1))
+    currentStrafeRoll += (targetStrafeRoll - currentStrafeRoll) * smoothAlpha
+
+    -- Camera tilt vẫn hoạt động độc lập với công tắc Camera Shake.
     local x, y, roll = 0, 0, 0
-    if moving and ((running and runningShakeEnabled) or (not running and walkingShakeEnabled)) then
-        local rate = running and 13 or 8
-        local amount = (running and 0.045 or 0.022) * cameraShakeIntensity
-        y += math.abs(math.sin(cameraTime * rate)) * amount
-        x += math.sin(cameraTime * rate * 0.5) * amount * 0.55
-        roll += math.sin(cameraTime * rate * 0.5) * amount * 0.35
-    elseif not moving and idleSwayEnabled then
-        -- Idle sway tăng rõ hơn: chuyển động chậm, lệch pha để giống camera cầm tay.
-        -- Vẫn nhân với Camera Intensity để người chơi tự giảm/tăng được.
-        local amount = 0.140 * cameraShakeIntensity -- 50% tương đương 100% của bản IdleSway_2x
-        x += math.sin(cameraTime * 1.05) * amount
-        y += math.sin(cameraTime * 1.45 + 0.6) * amount * 0.75
-        roll += math.sin(cameraTime * 0.9 + 0.3) * amount * 0.22
+
+    if cameraShakeEnabled and humanoid and humanoid.Health > 0 then
+        cameraTime += math.min(dt, 0.05)
+
+        local moving = humanoid.MoveDirection.Magnitude > 0.05
+        local speed = humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed
+        local running = moving and speed > 18
+
+        if moving and ((running and runningShakeEnabled) or (not running and walkingShakeEnabled)) then
+            local rate = running and 13 or 8
+            local amount = (running and 0.045 or 0.022) * cameraShakeIntensity
+            y += math.abs(math.sin(cameraTime * rate)) * amount
+            x += math.sin(cameraTime * rate * 0.5) * amount * 0.55
+            roll += math.sin(cameraTime * rate * 0.5) * amount * 0.35
+        elseif not moving and idleSwayEnabled then
+            local amount = 0.140 * cameraShakeIntensity
+            x += math.sin(cameraTime * 1.05) * amount
+            y += math.sin(cameraTime * 1.45 + 0.6) * amount * 0.75
+            roll += math.sin(cameraTime * 0.9 + 0.3) * amount * 0.22
+        end
+
+        if impactShakeEnabled and impactStrength > 0.001 then
+            local decay = math.min(dt * 5, 1)
+            y -= 0.09 * impactStrength * cameraShakeIntensity
+            x += math.sin(cameraTime * 35) * 0.035 * impactStrength * cameraShakeIntensity
+            roll += math.sin(cameraTime * 28) * 0.025 * impactStrength * cameraShakeIntensity
+            impactStrength *= (1 - decay)
+        end
     end
 
-    if impactShakeEnabled and impactStrength > 0.001 then
-        local decay = math.min(dt * 5, 1)
-        y -= 0.09 * impactStrength * cameraShakeIntensity
-        x += math.sin(cameraTime * 35) * 0.035 * impactStrength * cameraShakeIntensity
-        roll += math.sin(cameraTime * 28) * 0.025 * impactStrength * cameraShakeIntensity
-        impactStrength *= (1 - decay)
-    end
-
-    -- Camera shake only: tidak ikut yaw/pitch/roll của đầu để tránh tự xoay.
-    -- Người chơi luôn giữ toàn quyền điều khiển hướng nhìn bằng chuột.
-    -- Chỉ thêm chuyển động tịnh tiến rất nhẹ và roll quanh trục nhìn.
+    -- Chỉ thêm hiệu ứng camera cục bộ; không đổi hướng điều khiển nhân vật.
     camera.CFrame = camera.CFrame
         * CFrame.new(x, y, 0)
-        * CFrame.Angles(0, 0, roll)
+        * CFrame.Angles(0, 0, roll + currentStrafeRoll)
 end)
 
 screenGui.Destroying:Connect(function()
@@ -860,6 +882,12 @@ createToggleButton("💥 Impact Shake", impactShakeEnabled, function(state)
 end)
 createToggleButton("🌬️ Idle Sway", idleSwayEnabled, function(state)
     idleSwayEnabled = state
+end)
+createToggleButton("↔️ Movement Camera Tilt", strafeTiltEnabled, function(state)
+    strafeTiltEnabled = state
+end)
+createSlider("📐 Tilt Angle (degrees)", 0, 12, 5, function(value)
+    strafeTiltAngle = value
 end)
 createSlider("🎚️ Camera Intensity (%)", 0, 100, 50, function(value)
     cameraShakeIntensity = value / 100
